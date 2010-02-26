@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Chris Lamb <lamby@debian.org>
 Build-Depends: debhelper (>= 7)
 Build-Depends-Indep: python-support
-Standards-Version: 3.8.3
+Standards-Version: 3.8.4
 Vcs-Git: git://git.chris-lamb.co.uk/debian/pkg-python-redis.git
 Vcs-Browser: http://git.chris-lamb.co.uk/?p=debian/pkg-python-redis.git
 Homepage: http://github.com/andymccurdy/redis-py/

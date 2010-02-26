@@ -1,6 +1,7 @@
 python-redis (1.34.1-1) UNRELEASED; urgency=low
 
   * New upstream release (Closes: #571563)
+  * Bump Standards-Version to 3.8.4.
 
  -- Chris Lamb <lamby@debian.org>  Fri, 26 Feb 2010 02:06:58 +0000
 
