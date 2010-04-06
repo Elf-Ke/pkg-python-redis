@@ -1,8 +1,8 @@
-python-redis (1.34.1+git20100401235334-1) UNRELEASED; urgency=low
+python-redis (1.34.1+git20100401235334-1) unstable; urgency=low
 
   * New upstream snapshot.
 
- -- Chris Lamb <lamby@debian.org>  Tue, 06 Apr 2010 16:55:30 +0100
+ -- Chris Lamb <lamby@debian.org>  Tue, 06 Apr 2010 17:01:09 +0100
 
 python-redis (1.34.1-1) unstable; urgency=low
 
