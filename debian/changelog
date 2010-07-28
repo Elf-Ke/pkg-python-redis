@@ -1,6 +1,7 @@
 python-redis (2.0.0-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Bump Standards-Version to 3.9.1.
 
  -- Chris Lamb <lamby@debian.org>  Wed, 28 Jul 2010 09:47:01 -0400
 
