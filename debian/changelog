@@ -1,9 +1,9 @@
-python-redis (2.2.1-1) UNRELEASED; urgency=low
+python-redis (2.2.1-1) unstable; urgency=low
 
   * New upstream release.
   * Update Vcs-{Git,Browser}.
 
- -- Chris Lamb <lamby@debian.org>  Sat, 26 Feb 2011 22:36:17 +0000
+ -- Chris Lamb <lamby@debian.org>  Sat, 26 Feb 2011 22:39:33 +0000
 
 python-redis (2.0.0-1) unstable; urgency=low
 
