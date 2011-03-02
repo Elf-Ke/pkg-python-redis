@@ -1,3 +1,10 @@
+python-redis (2.2.1-2) UNRELEASED; urgency=low
+
+  * Rebuild in sane environment to prevent uninstallability on sid.
+    (Closes: #616000)
+
+ -- Chris Lamb <lamby@debian.org>  Wed, 02 Mar 2011 00:35:57 +0000
+
 python-redis (2.2.1-1) unstable; urgency=low
 
   * New upstream release.
