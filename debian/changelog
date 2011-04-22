@@ -1,3 +1,9 @@
+python-redis (2.2.1-3) UNRELEASED; urgency=low
+
+  * Fix debian/watch file.
+
+ -- Chris Lamb <lamby@debian.org>  Fri, 22 Apr 2011 15:58:30 +0100
+
 python-redis (2.2.1-2) unstable; urgency=low
 
   * Rebuild in sane environment to prevent uninstallability on sid.
