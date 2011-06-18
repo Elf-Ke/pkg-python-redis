@@ -1,9 +1,9 @@
-python-redis (2.4.5-1) UNRELEASED; urgency=low
+python-redis (2.4.5-1) unstable; urgency=low
 
   * New upstream release.
   * Bump Standards-Version to 3.9.2.
 
- -- Chris Lamb <lamby@debian.org>  Sat, 18 Jun 2011 14:37:44 +0100
+ -- Chris Lamb <lamby@debian.org>  Sat, 18 Jun 2011 14:55:43 +0100
 
 python-redis (2.2.4-1) unstable; urgency=low
 
