@@ -12,14 +12,15 @@ from redis.exceptions import (
     PubSubError,
     RedisError,
     ResponseError,
+    WatchError,
     )
 
 
-__version__ = '2.4.5'
+__version__ = '2.4.9'
 VERSION = tuple(map(int, __version__.split('.')))
 
 __all__ = [
     'Redis', 'ConnectionPool', 'Connection', 'UnixDomainSocketConnection',
     'RedisError', 'ConnectionError', 'ResponseError', 'AuthenticationError',
-    'InvalidResponse', 'DataError', 'PubSubError',
+    'InvalidResponse', 'DataError', 'PubSubError', 'WatchError',
     ]

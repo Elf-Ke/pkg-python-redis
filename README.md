@@ -122,6 +122,117 @@ If you use multiple Redis databases within the same application, you should
 create a separate client instance (and possibly a separate connection pool) for
 each database.
 
+It is not save to pass PubSub objects between threads.
+
+## Pipelines
+
+Pipelines are a subclass of the base Redis class that provide support for
+buffering multiple commands to the server in a single request. They can be used
+to dramatically increase the performance of groups of commands by reducing the
+number of back-and-forth TCP packets between the client and server.
+
+Pipelines are quite simple to use:
+
+    >>> r = redis.Redis(...)
+    >>> r.set('bing', 'baz')
+    >>> # Use the pipeline() method to create a pipeline instance
+    >>> pipe = redis.pipeline()
+    >>> # The following SET commands are buffered
+    >>> pipe.set('foo', 'bar')
+    >>> pipe.get('bing')
+    >>> # the EXECUTE call sends all buffered commands to the server, returning
+    >>> # a list of responses, one for each command.
+    >>> pipe.execute()
+    [True, 'baz']
+
+For ease of use, all commands being buffered into the pipeline return the
+pipeline object itself. Therefore calls can be chained like:
+
+    >>> pipe.set('foo', 'bar').sadd('faz', 'baz').incr('auto_number').execute()
+    [True, True, 6]
+
+In addition, pipelines can also ensure the buffered commands are executed
+atomically as a group. This happens by default. If you want to disable the
+atomic nature of a pipeline but still want to buffer commands, you can turn
+off transactions.
+
+    >>> pipe = r.pipeline(transaction=False)
+
+A common issue occurs when requiring atomic transactions but needing to
+retrieve values in Redis prior for use within the transaction. For instance,
+let's assume that the INCR command didn't exist and we need to build an atomic
+version of INCR in Python.
+
+The completely naive implementation could GET the value, increment it in
+Python, and SET the new value back. However, this is not atomic because
+multiple clients could be doing this at the same time, each getting the same
+value from GET.
+
+Enter the WATCH command. WATCH provides the ability to monitor one or more keys
+prior to starting a transaction. If any of those keys change prior the
+execution of that transaction, the entre transaction will be canceled and a
+WatchError will be raised. To implement our own client-side INCR command, we
+could do something like this:
+
+    >>> with r.pipeline() as pipe:
+    ...     while 1:
+    ...         try:
+    ...             # put a WATCH on the key that holds our sequence value
+    ...             pipe.watch('OUR-SEQUENCE-KEY')
+    ...             # after WATCHing, the pipeline is put into immediate execution
+    ...             # mode until we tell it to start buffering commands again.
+    ...             # this allows us to get the current value of our sequence
+    ...             current_value = pipe.get('OUR-SEQUENCE-KEY')
+    ...             next_value = int(current_value) + 1
+    ...             # now we can put the pipeline back into buffered mode with MULTI
+    ...             pipe.multi()
+    ...             pipe.set('OUR-SEQUENCE-KEY', next_value)
+    ...             # and finally, execute the pipeline (the set command)
+    ...             pipe.execute()
+    ...             # if a WatchError wasn't raised during execution, everything
+    ...             # we just did happened atomically.
+    ...             break
+    ...        except WatchError:
+    ...             # another client must have changed 'OUR-SEQUENCE-KEY' between
+    ...             # the time we started WATCHing it and the pipeline's execution.
+    ...             # our best bet is to just retry.
+    ...             continue
+
+Note that, because the Pipeline must bind to a single connection for the
+duration of a WATCH, care must be taken to ensure that he connection is
+returned to the connection pool by calling the reset() method. If the
+Pipeline is used as a context manager (as in the example above) reset()
+will be called automatically. Of course you can do this the manual way as by
+explicity calling reset():
+
+    >>> pipe = r.pipeline()
+    >>> while 1:
+    ...     try:
+    ...         pipe.watch('OUR-SEQUENCE-KEY')
+    ...         ...
+    ...         pipe.execute()
+    ...         break
+    ...     except WatchError:
+    ...         continue
+    ...     finally:
+    ...         pipe.reset()
+
+A convenience method named "transaction" exists for handling all the
+boilerplate of handling and retrying watch errors. It takes a callable that
+should expect a single parameter, a pipeline object, and any number of keys to
+be WATCHed. Our client-side INCR command above can be written like this,
+which is much easier to read:
+
+    >>> def client_side_incr(pipe):
+    ...     current_value = pipe.get('OUR-SEQUENCE-KEY')
+    ...     next_value = int(current_value) + 1
+    ...     pipe.multi()
+    ...     pipe.set('OUR-SEQUENCE-KEY', next_value)
+    >>>
+    >>> r.transaction(client_side_incr, 'OUR-SEQUENCE-KEY')
+    [True]
+
+
 ## API Reference
 
 The official Redis documentation does a great job of explaining each command in
@@ -141,11 +252,14 @@ arguments as the official spec. There are a few exceptions noted here:
 * MULTI/EXEC: These are implemented as part of the Pipeline class. Calling
   the pipeline method and specifying use_transaction=True will cause the
   pipeline to be wrapped with the MULTI and EXEC statements when it is executed.
+  See more about Pipelines above.
 * SUBSCRIBE/LISTEN: Similar to pipelines, PubSub is implemented as a separate
   class as it places the underlying connection in a state where it can't
   execute non-pubsub commands. Calling the pubsub method from the Redis client
   will return a PubSub instance where you can subscribe to channels and listen
   for messages. You can call PUBLISH from both classes.
+* LREM: Order of 'num' and 'value' arguments reversed such that 'num' can
+  provide a default value of zero.
 
 ## Versioning scheme
 
