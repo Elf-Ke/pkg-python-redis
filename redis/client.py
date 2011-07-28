@@ -1,3 +1,4 @@
+from __future__ import with_statement
 import datetime
 import time
 import warnings
@@ -81,8 +82,9 @@ def zset_score_pairs(response, **options):
     """
     if not response or not options['withscores']:
         return response
+    score_cast_func = options.get('score_cast_func', float)
     it = iter(response)
-    return zip(it, imap(float, it))
+    return zip(it, imap(score_cast_func, it))
 
 def int_or_none(response):
     if response is None:
@@ -201,6 +203,22 @@ class Redis(object):
             self.response_callbacks,
             transaction,
             shard_hint)
+
+    def transaction(self, func, *watches, **kwargs):
+        """
+        Convenience method for executing the callable `func` as a transaction
+        while watching all keys specified in `watches`. The 'func' callable
+        should expect a single arguement which is a Pipeline object.
+        """
+        shard_hint = kwargs.pop('shard_hint', None)
+        with self.pipeline(True, shard_hint) as pipe:
+            while 1:
+                try:
+                    pipe.watch(*watches)
+                    func(pipe)
+                    return pipe.execute()
+                except WatchError:
+                    continue
 
     def lock(self, name, timeout=None, sleep=0.1):
         """
@@ -503,13 +521,13 @@ class Redis(object):
         """
         Watches the values at keys ``names``, or None if the key doesn't exist
         """
-        return self.execute_command('WATCH', *names)
+        warnings.warn(DeprecationWarning('Call WATCH from a Pipeline object'))
 
     def unwatch(self):
         """
         Unwatches the value at key ``name``, or None of the key doesn't exist
         """
-        return self.execute_command('UNWATCH')
+        warnings.warn(DeprecationWarning('Call UNWATCH from a Pipeline object'))
 
     #### LIST COMMANDS ####
     def blpop(self, keys, timeout=0):
@@ -592,9 +610,9 @@ class Redis(object):
         "Remove and return the first item of the list ``name``"
         return self.execute_command('LPOP', name)
 
-    def lpush(self, name, value):
-        "Push ``value`` onto the head of the list ``name``"
-        return self.execute_command('LPUSH', name, value)
+    def lpush(self, name, *values):
+        "Push ``values`` onto the head of the list ``name``"
+        return self.execute_command('LPUSH', name, *values)
 
     def lpushx(self, name, value):
         "Push ``value`` onto the head of the list ``name`` if ``name`` exists"
@@ -643,9 +661,9 @@ class Redis(object):
         """
         return self.execute_command('RPOPLPUSH', src, dst)
 
-    def rpush(self, name, value):
-        "Push ``value`` onto the tail of the list ``name``"
-        return self.execute_command('RPUSH', name, value)
+    def rpush(self, name, *values):
+        "Push ``values`` onto the tail of the list ``name``"
+        return self.execute_command('RPUSH', name, *values)
 
     def rpushx(self, name, value):
         "Push ``value`` onto the tail of the list ``name`` if ``name`` exists"
@@ -707,9 +725,9 @@ class Redis(object):
 
 
     #### SET COMMANDS ####
-    def sadd(self, name, value):
-        "Add ``value`` to set ``name``"
-        return self.execute_command('SADD', name, value)
+    def sadd(self, name, *values):
+        "Add ``value(s)`` to set ``name``"
+        return self.execute_command('SADD', name, *values)
 
     def scard(self, name):
         "Return the number of elements in set ``name``"
@@ -761,9 +779,9 @@ class Redis(object):
         "Return a random member of set ``name``"
         return self.execute_command('SRANDMEMBER', name)
 
-    def srem(self, name, value):
-        "Remove ``value`` from set ``name``"
-        return self.execute_command('SREM', name, value)
+    def srem(self, name, *values):
+        "Remove ``values`` from set ``name``"
+        return self.execute_command('SREM', name, *values)
 
     def sunion(self, keys, *args):
         "Return the union of sets specifiued by ``keys``"
@@ -821,27 +839,31 @@ class Redis(object):
         """
         return self._zaggregate('ZINTERSTORE', dest, keys, aggregate)
 
-    def zrange(self, name, start, end, desc=False, withscores=False):
+    def zrange(self, name, start, end, desc=False, withscores=False,
+               score_cast_func=float):
         """
         Return a range of values from sorted set ``name`` between
         ``start`` and ``end`` sorted in ascending order.
 
         ``start`` and ``end`` can be negative, indicating the end of the range.
 
-        ``desc`` indicates to sort in descending order.
+        ``desc`` a boolean indicating whether to sort the results descendingly
 
         ``withscores`` indicates to return the scores along with the values.
         The return type is a list of (value, score) pairs
+
+        ``score_cast_func`` a callable used to cast the score return value
         """
         if desc:
             return self.zrevrange(name, start, end, withscores)
         pieces = ['ZRANGE', name, start, end]
         if withscores:
             pieces.append('withscores')
-        return self.execute_command(*pieces, **{'withscores': withscores})
+        options = {'withscores': withscores, 'score_cast_func': score_cast_func}
+        return self.execute_command(*pieces, **options)
 
     def zrangebyscore(self, name, min, max,
-            start=None, num=None, withscores=False):
+            start=None, num=None, withscores=False, score_cast_func=float):
         """
         Return a range of values from the sorted set ``name`` with scores
         between ``min`` and ``max``.
@@ -851,6 +873,8 @@ class Redis(object):
 
         ``withscores`` indicates to return the scores along with the values.
         The return type is a list of (value, score) pairs
+
+        `score_cast_func`` a callable used to cast the score return value
         """
         if (start is not None and num is None) or \
                 (num is not None and start is None):
@@ -860,7 +884,8 @@ class Redis(object):
             pieces.extend(['LIMIT', start, num])
         if withscores:
             pieces.append('withscores')
-        return self.execute_command(*pieces, **{'withscores': withscores})
+        options = {'withscores': withscores, 'score_cast_func': score_cast_func}
+        return self.execute_command(*pieces, **options)
 
     def zrank(self, name, value):
         """
@@ -869,9 +894,9 @@ class Redis(object):
         """
         return self.execute_command('ZRANK', name, value)
 
-    def zrem(self, name, value):
-        "Remove member ``value`` from sorted set ``name``"
-        return self.execute_command('ZREM', name, value)
+    def zrem(self, name, *values):
+        "Remove member ``values`` from sorted set ``name``"
+        return self.execute_command('ZREM', name, *values)
 
     def zremrangebyrank(self, name, min, max):
         """
@@ -889,7 +914,8 @@ class Redis(object):
         """
         return self.execute_command('ZREMRANGEBYSCORE', name, min, max)
 
-    def zrevrange(self, name, start, num, withscores=False):
+    def zrevrange(self, name, start, num, withscores=False,
+                  score_cast_func=float):
         """
         Return a range of values from sorted set ``name`` between
         ``start`` and ``num`` sorted in descending order.
@@ -898,14 +924,17 @@ class Redis(object):
 
         ``withscores`` indicates to return the scores along with the values
         The return type is a list of (value, score) pairs
+
+        ``score_cast_func`` a callable used to cast the score return value
         """
         pieces = ['ZREVRANGE', name, start, num]
         if withscores:
             pieces.append('withscores')
-        return self.execute_command(*pieces, **{'withscores': withscores})
+        options = {'withscores': withscores, 'score_cast_func': score_cast_func}
+        return self.execute_command(*pieces, **options)
 
     def zrevrangebyscore(self, name, max, min,
-            start=None, num=None, withscores=False):
+            start=None, num=None, withscores=False, score_cast_func=float):
         """
         Return a range of values from the sorted set ``name`` with scores
         between ``min`` and ``max`` in descending order.
@@ -915,6 +944,8 @@ class Redis(object):
 
         ``withscores`` indicates to return the scores along with the values.
         The return type is a list of (value, score) pairs
+
+        ``score_cast_func`` a callable used to cast the score return value
         """
         if (start is not None and num is None) or \
                 (num is not None and start is None):
@@ -924,7 +955,8 @@ class Redis(object):
             pieces.extend(['LIMIT', start, num])
         if withscores:
             pieces.append('withscores')
-        return self.execute_command(*pieces, **{'withscores': withscores})
+        options = {'withscores': withscores, 'score_cast_func': score_cast_func}
+        return self.execute_command(*pieces, **options)
 
     def zrevrank(self, name, value):
         """
@@ -961,9 +993,9 @@ class Redis(object):
         return self.execute_command(*pieces)
 
     #### HASH COMMANDS ####
-    def hdel(self, name, key):
-        "Delete ``key`` from hash ``name``"
-        return self.execute_command('HDEL', name, key)
+    def hdel(self, name, *keys):
+        "Delete ``keys`` from hash ``name``"
+        return self.execute_command('HDEL', name, *keys)
 
     def hexists(self, name, key):
         "Returns a boolean indicating if ``key`` exists within hash ``name``"
@@ -1128,13 +1160,6 @@ class PubSub(object):
                 pass
         return self.execute_command('UNSUBSCRIBE', *channels)
 
-    def publish(self, channel, message):
-        """
-        Publish ``message`` on ``channel``.
-        Returns the number of subscribers the message was delivered to.
-        """
-        return self.execute_command('PUBLISH', channel, message)
-
     def listen(self):
         "Listen for messages on channels this client has been subscribed to"
         while self.subscription_count:
@@ -1174,20 +1199,94 @@ class Pipeline(Redis):
     ResponseError exceptions, such as those raised when issuing a command
     on a key of a different datatype.
     """
+
+    UNWATCH_COMMANDS = set(('DISCARD', 'EXEC', 'UNWATCH'))
+
     def __init__(self, connection_pool, response_callbacks, transaction,
                  shard_hint):
         self.connection_pool = connection_pool
+        self.connection = None
         self.response_callbacks = response_callbacks
         self.transaction = transaction
         self.shard_hint = shard_hint
+
+        self.watching = False
+        self.reset()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
         self.reset()
 
     def reset(self):
         self.command_stack = []
-        if self.transaction:
-            self.execute_command('MULTI')
+        # make sure to reset the connection state in the event that we were
+        # watching something
+        if self.watching and self.connection:
+            try:
+                # call this manually since our unwatch or
+                # immediate_execute_command methods can call reset()
+                self.connection.send_command('UNWATCH')
+                self.connection.read_response()
+            except ConnectionError:
+                # disconnect will also remove any previous WATCHes
+                self.connection.disconnect()
+        # clean up the other instance attributes
+        self.watching = False
+        self.explicit_transaction = False
+        # we can safely return the connection to the pool here since we're
+        # sure we're no longer WATCHing anything
+        if self.connection:
+            self.connection_pool.release(self.connection)
+            self.connection = None
 
-    def execute_command(self, *args, **options):
+    def multi(self):
+        """
+        Start a transactional block of the pipeline after WATCH commands
+        are issued. End the transactional block with `execute`.
+        """
+        if self.explicit_transaction:
+            raise RedisError('Cannot issue nested calls to MULTI')
+        if self.command_stack:
+            raise RedisError('Commands without an initial WATCH have already '
+                             'been issued')
+        self.explicit_transaction = True
+
+    def execute_command(self, *args, **kwargs):
+        if (self.watching or args[0] == 'WATCH') and \
+                not self.explicit_transaction:
+            return self.immediate_execute_command(*args, **kwargs)
+        return self.pipeline_execute_command(*args, **kwargs)
+
+    def immediate_execute_command(self, *args, **options):
+        """
+        Execute a command immediately, but don't auto-retry on a
+        ConnectionError if we're already WATCHing a variable. Used when
+        issuing WATCH or subsequent commands retrieving their values but before
+        MULTI is called.
+        """
+        command_name = args[0]
+        conn = self.connection
+        # if this is the first call, we need a connection
+        if not conn:
+            conn = self.connection_pool.get_connection(command_name,
+                                                       self.shard_hint)
+            self.connection = conn
+        try:
+            conn.send_command(*args)
+            return self.parse_response(conn, command_name, **options)
+        except ConnectionError:
+            conn.disconnect()
+            # if we're not already watching, we can safely retry the command
+            # assuming it was a connection timeout
+            if not self.watching:
+                conn.send_command(*args)
+                return self.parse_response(conn, command_name, **options)
+            self.reset()
+            raise
+
+    def pipeline_execute_command(self, *args, **options):
         """
         Stage a command to be executed when execute() is next called
 
@@ -1221,7 +1320,7 @@ class Pipeline(Redis):
 
         if len(response) != len(commands):
             raise ResponseError("Wrong number of response items from "
-                "pipeline execution")
+                                "pipeline execution")
         # We have to run response callbacks manually
         data = []
         for r, cmd in izip(response, commands):
@@ -1234,30 +1333,69 @@ class Pipeline(Redis):
         return data
 
     def _execute_pipeline(self, connection, commands):
-    # build up all commands into a single request to increase network perf
+        # build up all commands into a single request to increase network perf
         all_cmds = ''.join(starmap(connection.pack_command,
                                    [args for args, options in commands]))
         connection.send_packed_command(all_cmds)
         return [self.parse_response(connection, args[0], **options)
                 for args, options in commands]
 
+    def parse_response(self, connection, command_name, **options):
+        result = super(Pipeline, self).parse_response(
+            connection, command_name, **options)
+        if command_name in self.UNWATCH_COMMANDS:
+            self.watching = False
+        elif command_name == 'WATCH':
+            self.watching = True
+        return result
+
     def execute(self):
         "Execute all the commands in the current pipeline"
-        if self.transaction:
-            self.execute_command('EXEC')
+        stack = self.command_stack
+        if self.transaction or self.explicit_transaction:
+            stack = [(('MULTI' ,), {})] + stack + [(('EXEC', ), {})]
             execute = self._execute_transaction
         else:
             execute = self._execute_pipeline
-        stack = self.command_stack
-        self.reset()
-        conn = self.connection_pool.get_connection('MULTI', self.shard_hint)
+
+        conn = self.connection
+        if not conn:
+            conn = self.connection_pool.get_connection('MULTI', self.shard_hint)
+            # assign to self.connection so reset() releases the connection
+            # back to the pool after we're done
+            self.connection = conn
+
         try:
             return execute(conn, stack)
         except ConnectionError:
             conn.disconnect()
+            # if we were watching a variable, the watch is no longer valid since
+            # this connection has died. raise a WatchError, which indicates
+            # the user should retry his transaction. If this is more than a
+            # temporary failure, the WATCH that the user next issue will fail,
+            # propegating the real ConnectionError
+            if self.watching:
+                raise WatchError("A ConnectionError occured on while watching "
+                                 "one or more keys")
+            # otherwise, it's safe to retry since the transaction isn't
+            # predicated on any state
             return execute(conn, stack)
         finally:
-            self.connection_pool.release(conn)
+            self.reset()
+
+    def watch(self, *names):
+        """
+        Watches the values at keys ``names``
+        """
+        if self.explicit_transaction:
+            raise RedisError('Cannot issue a WATCH after a MULTI')
+        return self.execute_command('WATCH', *names)
+
+    def unwatch(self):
+        """
+        Unwatches all previously specified keys
+        """
+        return self.watching and self.execute_command('UNWATCH') or True
 
 
 class LockError(RedisError):
