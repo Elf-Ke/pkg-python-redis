@@ -2,7 +2,7 @@ python-redis (2.4.9-1~bpo60+1) squeeze-backports; urgency=low
 
   * Rebuild for squeeze-backports.
 
- -- Chris Lamb <lamby@debian.org>  Thu, 17 Nov 2011 10:47:39 +0000
+ -- Chris Lamb <lamby@debian.org>  Thu, 17 Nov 2011 10:50:22 +0000
 
 python-redis (2.4.9-1) unstable; urgency=low
 
