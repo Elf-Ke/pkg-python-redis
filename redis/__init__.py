@@ -1,9 +1,10 @@
-from redis.client import Redis
+from redis.client import Redis, StrictRedis
 from redis.connection import (
     ConnectionPool,
     Connection,
     UnixDomainSocketConnection
     )
+from redis.utils import from_url
 from redis.exceptions import (
     AuthenticationError,
     ConnectionError,
@@ -16,11 +17,12 @@ from redis.exceptions import (
     )
 
 
-__version__ = '2.4.9'
+__version__ = '2.4.13'
 VERSION = tuple(map(int, __version__.split('.')))
 
 __all__ = [
-    'Redis', 'ConnectionPool', 'Connection', 'UnixDomainSocketConnection',
+    'Redis', 'StrictRedis', 'ConnectionPool',
+    'Connection', 'UnixDomainSocketConnection',
     'RedisError', 'ConnectionError', 'ResponseError', 'AuthenticationError',
-    'InvalidResponse', 'DataError', 'PubSubError', 'WatchError',
+    'InvalidResponse', 'DataError', 'PubSubError', 'WatchError', 'from_url',
     ]
