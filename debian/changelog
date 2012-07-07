@@ -1,3 +1,10 @@
+python-redis (2.4.13-2) UNRELEASED; urgency=low
+
+  * Transition to dh_python2. Thanks to Andres Rodriguez <andreserl@gmail.com>
+    (Closes: #680567)
+
+ -- Chris Lamb <lamby@debian.org>  Sat, 07 Jul 2012 21:11:33 +0100
+
 python-redis (2.4.13-1) unstable; urgency=low
 
   * New upstream release.
