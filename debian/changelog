@@ -1,3 +1,9 @@
+python-redis (2.7.2-1) UNRELEASED; urgency=low
+
+  * New upstream version. (Closes: #729834)
+
+ -- Chris Lamb <lamby@debian.org>  Mon, 18 Nov 2013 12:09:40 +0000
+
 python-redis (2.4.13-2) unstable; urgency=low
 
   * Transition to dh_python2. Thanks to Andres Rodriguez <andreserl@gmail.com>
