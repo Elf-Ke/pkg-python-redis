@@ -1,2 +1,2 @@
 version=3
-http://github.com/andymccurdy/redis-py/downloads .*/redis-(?:py-)?(.*).tar.gz
+http://github.com/andymccurdy/redis-py/releases archive/(.*).tar.gz
