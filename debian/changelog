@@ -1,8 +1,8 @@
-python-redis (2.10.1-1) UNRELEASED; urgency=low
+python-redis (2.10.1-1) unstable; urgency=low
 
   * New upstream release.
 
- -- Chris Lamb <lamby@debian.org>  Sat, 05 Jul 2014 17:16:35 +0100
+ -- Chris Lamb <lamby@debian.org>  Sat, 05 Jul 2014 17:20:32 +0100
 
 python-redis (2.9.1-3) unstable; urgency=medium
 
